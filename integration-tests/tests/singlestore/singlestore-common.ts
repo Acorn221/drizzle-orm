@@ -47,8 +47,8 @@ import {
 	primaryKey,
 	real,
 	serial,
-	singlestoreDatabase,
 	singlestoreEnum,
+	singlestoreSchema,
 	singlestoreTable,
 	singlestoreTableCreator,
 	/* singlestoreView, */
@@ -229,7 +229,7 @@ const vectorSearchTable = singlestoreTable('vector_search', {
 });
 
 // To test another schema and multischema
-const mySchema = singlestoreDatabase(`mySchema`);
+const mySchema = singlestoreSchema(`mySchema`);
 
 const usersMySchemaTable = mySchema.table('userstest', {
 	id: serial('id').primaryKey(),

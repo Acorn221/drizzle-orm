@@ -27,6 +27,7 @@ import type {
 } from './session.ts';
 import type { WithBuilder } from './subquery.ts';
 import type { SingleStoreTable } from './table.ts';
+import { SingleStoreTempTableBuilder } from './temp-table.ts';
 
 export class SingleStoreDatabase<
 	TQueryResult extends SingleStoreQueryResultHKT,
@@ -487,6 +488,32 @@ export class SingleStoreDatabase<
 		config?: SingleStoreTransactionConfig,
 	): Promise<T> {
 		return this.session.transaction(transaction, config);
+	}
+
+	/**
+	 * Pattern 1: Creates a temporary table builder from GitHub issue #3104.
+	 *
+	 * Usage: const myTemporaryTable = await db.temp('my_temporary_table').as(query);
+	 *
+	 * @param name The name for the temporary table
+	 *
+	 * @example
+	 *
+	 * ```ts
+	 * // Pattern 1: Create a temporary table from a query  
+	 * const myTemporaryTable = await db
+	 *   .temp('my_temporary_table')
+	 *   .as(db.select().from(users));
+	 *
+	 * // Use it like any other table
+	 * const rows = await db.select().from(myTemporaryTable);
+	 * 
+	 * // Drop it when done
+	 * await myTemporaryTable.drop();
+	 * ```
+	 */
+	temp(name: string): SingleStoreTempTableBuilder {
+		return new SingleStoreTempTableBuilder(name, (sql: SQL) => this.execute(sql), this.dialect);
 	}
 }
 

@@ -1,8 +1,9 @@
 import { entityKind } from '~/entity.ts';
 import type { TypedQueryBuilder } from '~/query-builders/query-builder.ts';
 import { SQL, sql } from '~/sql/sql.ts';
-import { Subquery } from '~/subquery.ts';
 import type { SingleStoreDialect } from './dialect.ts';
+import { SingleStoreTable } from './table.ts';
+import { Table } from '~/table.ts';
 
 /**
  * Temporary table builder for creating temporary tables from queries.
@@ -74,10 +75,10 @@ export type InferTempTableSelectModel<T extends SingleStoreTempTable<any>> = T e
 export type InferTempTableInsertModel<T extends SingleStoreTempTable<any>> = InferTempTableSelectModel<T>;
 
 /**
- * A temporary table that extends Subquery to be compatible with .from() clauses.
+ * A temporary table that extends SingleStoreTable to work naturally with all table operations.
  */
 export class SingleStoreTempTable<TSelectedFields extends Record<string, unknown> = Record<string, unknown>>
-	extends Subquery<string, TSelectedFields>
+	extends SingleStoreTable<any>
 {
 	static override readonly [entityKind]: string = 'SingleStoreTempTable';
 
@@ -89,26 +90,40 @@ export class SingleStoreTempTable<TSelectedFields extends Record<string, unknown
 		public readonly selectedFields: TSelectedFields,
 		private readonly executeQuery: (sql: SQL) => Promise<any>,
 	) {
-		super(
-			sql`${sql.identifier(tableName)}`,
-			selectedFields,
-			tableName,
-			false,
-			[],
-		);
+		// Call SingleStoreTable constructor with our temp table name
+		// Table constructor expects: name, schema, baseName
+		super(tableName, undefined, tableName);
 
-		// Add columns as properties, avoiding conflicts with existing methods
-		const safeSelectedFields = Object.fromEntries(
-			Object.entries(selectedFields).filter(([key]) => !(key in this)),
-		);
-		Object.assign(this, safeSelectedFields);
-	}
+		// Create column proxies that reference THIS temp table instead of the original table
+		const builtColumns: Record<string, any> = {};
+		
+		for (const [key, column] of Object.entries(selectedFields)) {
+			// If this is a column object, create a proxy that references this temp table
+			if (column && typeof column === 'object' && 'table' in column) {
+				// Create a new column object that points to our temp table
+				const tempColumnProxy = Object.create(Object.getPrototypeOf(column));
+				// Copy all properties from the original column
+				Object.assign(tempColumnProxy, column);
+				// But change the table reference to point to this temp table
+				Object.defineProperty(tempColumnProxy, 'table', {
+					value: this,
+					writable: false,
+					enumerable: true,
+					configurable: false
+				});
+				builtColumns[key] = tempColumnProxy;
+			} else {
+				// Not a column, keep as is
+				builtColumns[key] = column;
+			}
+		}
 
-	/**
-	 * Override getSQL to return just the table identifier without parentheses.
-	 */
-	override getSQL(): SQL {
-		return sql`${sql.identifier(this.tableName)}`;
+		// Set up the table symbols like a real SingleStore table
+		(this as any)[Table.Symbol.Columns] = builtColumns;
+		(this as any)[Table.Symbol.ExtraConfigColumns] = builtColumns;
+
+		// Assign columns as properties to the table (like Object.assign(rawTable, builtColumns))
+		Object.assign(this, builtColumns);
 	}
 
 	/**

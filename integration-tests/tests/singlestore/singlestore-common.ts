@@ -3951,13 +3951,17 @@ export function tests(driver?: string) {
 								(3, 'Bob Johnson', 'bob@example.com', FALSE)
 			`);
 
+			const sq = db
+				.select()
+				.from(usersTable)
+				.where(eq(usersTable.active, true));
+
+			console.log(`sq`, sq.getSQL());
+
 			const myTemporaryTable = await db
 				.temp('my_temporary_table')
 				.as(
-					db
-						.select()
-						.from(usersTable)
-						.where(eq(usersTable.active, true)),
+					sq,
 				);
 
 			expectTypeOf(myTemporaryTable).toHaveProperty('id');

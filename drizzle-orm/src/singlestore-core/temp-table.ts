@@ -1,8 +1,8 @@
 import { entityKind } from '~/entity.ts';
-import { sql, SQL } from '~/sql/sql.ts';
 import type { TypedQueryBuilder } from '~/query-builders/query-builder.ts';
-import type { SingleStoreDialect } from './dialect.ts';
+import { SQL, sql } from '~/sql/sql.ts';
 import { Subquery } from '~/subquery.ts';
+import type { SingleStoreDialect } from './dialect.ts';
 
 /**
  * Temporary table builder for creating temporary tables from queries.
@@ -28,18 +28,18 @@ export class SingleStoreTempTableBuilder {
 		} else {
 			querySQL = query;
 		}
-		
+
 		const builtQuery = this.dialect.sqlToQuery(querySQL);
-		
+
 		// Remove parentheses from the beginning and end if they exist
 		let cleanSQL = builtQuery.sql.trim();
 		if (cleanSQL.startsWith('(') && cleanSQL.endsWith(')')) {
 			cleanSQL = cleanSQL.slice(1, -1);
 		}
-		
+
 		const finalSQL = `CREATE TEMPORARY TABLE \`${this.name}\` AS ${cleanSQL}`;
 		const createSQL = sql.raw(finalSQL);
-		
+
 		if (builtQuery.params && builtQuery.params.length > 0) {
 			let paramIndex = 0;
 			const parameterizedSQL = finalSQL.replace(/\?/g, () => {
@@ -50,13 +50,13 @@ export class SingleStoreTempTableBuilder {
 		} else {
 			await this.executeQuery(createSQL);
 		}
-		
-		const selectedFields = 'getSelectedFields' in query 
-			? query.getSelectedFields() 
+
+		const selectedFields = 'getSelectedFields' in query
+			? query.getSelectedFields()
 			: ({} as TSelectedFields);
-		
+
 		const tempTable = new SingleStoreTempTable(this.name, selectedFields, this.executeQuery);
-		
+
 		return tempTable as SingleStoreTempTable<TSelectedFields> & TSelectedFields;
 	}
 }
@@ -64,8 +64,8 @@ export class SingleStoreTempTableBuilder {
 /**
  * Helper type to infer select model from selected fields
  */
-export type InferTempTableSelectModel<T extends SingleStoreTempTable<any>> = T extends SingleStoreTempTable<infer TSelectedFields> 
-	? TSelectedFields 
+export type InferTempTableSelectModel<T extends SingleStoreTempTable<any>> = T extends
+	SingleStoreTempTable<infer TSelectedFields> ? TSelectedFields
 	: never;
 
 /**
@@ -76,7 +76,9 @@ export type InferTempTableInsertModel<T extends SingleStoreTempTable<any>> = Inf
 /**
  * A temporary table that extends Subquery to be compatible with .from() clauses.
  */
-export class SingleStoreTempTable<TSelectedFields extends Record<string, unknown> = Record<string, unknown>> extends Subquery<string, TSelectedFields> {
+export class SingleStoreTempTable<TSelectedFields extends Record<string, unknown> = Record<string, unknown>>
+	extends Subquery<string, TSelectedFields>
+{
 	static override readonly [entityKind]: string = 'SingleStoreTempTable';
 
 	declare readonly $inferSelect: TSelectedFields;
@@ -92,12 +94,12 @@ export class SingleStoreTempTable<TSelectedFields extends Record<string, unknown
 			selectedFields,
 			tableName,
 			false,
-			[]
+			[],
 		);
-		
+
 		// Add columns as properties, avoiding conflicts with existing methods
 		const safeSelectedFields = Object.fromEntries(
-			Object.entries(selectedFields).filter(([key]) => !(key in this))
+			Object.entries(selectedFields).filter(([key]) => !(key in this)),
 		);
 		Object.assign(this, safeSelectedFields);
 	}
@@ -116,4 +118,4 @@ export class SingleStoreTempTable<TSelectedFields extends Record<string, unknown
 		const dropSQL = sql`DROP TEMPORARY TABLE ${sql.identifier(this.tableName)}`;
 		await this.executeQuery(dropSQL);
 	}
-} 
+}

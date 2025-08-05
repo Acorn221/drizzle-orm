@@ -502,7 +502,7 @@ export class SingleStoreDatabase<
 	 *   .as(db.select().from(users));
 	 *
 	 * const rows = await db.select().from(myTemporaryTable);
-	 * 
+	 *
 	 * await myTemporaryTable.drop();
 	 * ```
 	 */

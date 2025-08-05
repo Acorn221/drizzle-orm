@@ -47,8 +47,8 @@ import {
 	primaryKey,
 	real,
 	serial,
-	singlestoreEnum,
 	singlestoreDatabase,
+	singlestoreEnum,
 	singlestoreTable,
 	singlestoreTableCreator,
 	/* singlestoreView, */
@@ -3957,7 +3957,7 @@ export function tests(driver?: string) {
 					db
 						.select()
 						.from(usersTable)
-						.where(eq(usersTable.active, true))
+						.where(eq(usersTable.active, true)),
 				);
 
 			expectTypeOf(myTemporaryTable).toHaveProperty('id');
@@ -3968,14 +3968,16 @@ export function tests(driver?: string) {
 			expectTypeOf(myTemporaryTable.drop).toEqualTypeOf<() => Promise<void>>();
 
 			const rows = await db.select().from(myTemporaryTable);
-			
-			expectTypeOf(rows).toEqualTypeOf<Array<{
-				id: number;
-				name: string;
-				email: string | null;
-				active: boolean | null;
-			}>>();
-			
+
+			expectTypeOf(rows).toEqualTypeOf<
+				Array<{
+					id: number;
+					name: string;
+					email: string | null;
+					active: boolean | null;
+				}>
+			>();
+
 			expect(rows).toHaveLength(2);
 
 			if (rows.length > 0) {
@@ -4048,7 +4050,7 @@ export function tests(driver?: string) {
 						.from(customersTable)
 						.innerJoin(ordersTable, eq(customersTable.id, ordersTable.userId))
 						.where(eq(ordersTable.status, 'completed'))
-						.groupBy(customersTable.id, customersTable.name)
+						.groupBy(customersTable.id, customersTable.name),
 				);
 
 			expectTypeOf(customerSummary).toHaveProperty('customerId');
@@ -4061,17 +4063,19 @@ export function tests(driver?: string) {
 			const summary = await db.select({
 				id: customerSummary.customerId,
 			}).from(customerSummary).where(eq(customerSummary.customerId, 1));
-			
+
 			expectTypeOf(summary).toEqualTypeOf<Array<{ id: number }>>();
 			expect(summary).toHaveLength(1);
 
 			const fullSummary = await db.select().from(customerSummary);
-			expectTypeOf(fullSummary).toEqualTypeOf<Array<{
-				customerId: number;
-				customerName: string;
-				totalAmount: string | null;
-				orderCount: number;
-			}>>();
+			expectTypeOf(fullSummary).toEqualTypeOf<
+				Array<{
+					customerId: number;
+					customerName: string;
+					totalAmount: string | null;
+					orderCount: number;
+				}>
+			>();
 
 			await customerSummary.drop();
 			await db.execute(sql`DROP TABLE temp_orders`);

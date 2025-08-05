@@ -3925,10 +3925,9 @@ export function tests(driver?: string) {
 	});
 
 	describe('Temporary Tables', () => {
-		test('Pattern 1: db.temp().as() API - create temporary table from query', async (ctx) => {
+		test('db.temp().as() API - create temporary table from query', async (ctx) => {
 			const { db } = ctx.singlestore;
 
-			// Create and populate a regular table first
 			const usersTable = singlestoreTable('test_users_for_temp', {
 				id: int().primaryKey(),
 				name: varchar({ length: 255 }).notNull(),
@@ -3945,7 +3944,6 @@ export function tests(driver?: string) {
 							)
 			`);
 
-			// Insert test data
 			await db.execute(sql`
 				INSERT INTO test_users_for_temp VALUES 
 								(1, 'John Doe', 'john@example.com', TRUE),
@@ -3953,7 +3951,6 @@ export function tests(driver?: string) {
 								(3, 'Bob Johnson', 'bob@example.com', FALSE)
 			`);
 
-			// Pattern 1: The EXACT API from the GitHub issue
 			const myTemporaryTable = await db
 				.temp('my_temporary_table')
 				.as(
@@ -3963,7 +3960,6 @@ export function tests(driver?: string) {
 						.where(eq(usersTable.active, true))
 				);
 
-			// ✅ Type check: myTemporaryTable should have the same structure as the selected fields
 			expectTypeOf(myTemporaryTable).toHaveProperty('id');
 			expectTypeOf(myTemporaryTable).toHaveProperty('name');
 			expectTypeOf(myTemporaryTable).toHaveProperty('email');
@@ -3971,12 +3967,8 @@ export function tests(driver?: string) {
 			expectTypeOf(myTemporaryTable).toHaveProperty('drop');
 			expectTypeOf(myTemporaryTable.drop).toEqualTypeOf<() => Promise<void>>();
 
-			console.log('✅ Pattern 1 API working! Temp table created:', myTemporaryTable.name);
-			
-			// ✅ TypeScript types now work correctly!
 			const rows = await db.select().from(myTemporaryTable);
 			
-			// ✅ Type check: rows should be an array with proper column types
 			expectTypeOf(rows).toEqualTypeOf<Array<{
 				id: number;
 				name: string;
@@ -3986,7 +3978,6 @@ export function tests(driver?: string) {
 			
 			expect(rows).toHaveLength(2);
 
-			// ✅ Type check: Individual column access should be properly typed
 			if (rows.length > 0) {
 				const firstRow = rows[0]!;
 				expectTypeOf(firstRow.id).toEqualTypeOf<number>();
@@ -3995,18 +3986,13 @@ export function tests(driver?: string) {
 				expectTypeOf(firstRow.active).toEqualTypeOf<boolean | null>();
 			}
 
-			// Drop it when done
 			await myTemporaryTable.drop();
-			console.log('✅ Temporary table dropped successfully!');
-
-			// Clean up the test table
 			await db.execute(sql`DROP TABLE test_users_for_temp`);
 		});
 
-		test('Pattern 1: Complex query with joins and aggregations', async (ctx) => {
+		test('Complex query with joins and aggregations', async (ctx) => {
 			const { db } = ctx.singlestore;
 
-			// Create test tables
 			const ordersTable = singlestoreTable('temp_orders', {
 				id: int().primaryKey(),
 				userId: int().notNull(),
@@ -4019,7 +4005,6 @@ export function tests(driver?: string) {
 				name: varchar({ length: 255 }).notNull(),
 			});
 
-			// Setup tables
 			await db.execute(sql`
 				CREATE TABLE IF NOT EXISTS temp_orders (
 							id INT PRIMARY KEY,
@@ -4050,7 +4035,6 @@ export function tests(driver?: string) {
 							(4, 2, 150.75, 'completed')
 			`);
 
-			// Pattern 1: Create temp table with complex query - API WORKS!
 			const customerSummary = await db
 				.temp('customer_order_summary')
 				.as(
@@ -4067,39 +4051,29 @@ export function tests(driver?: string) {
 						.groupBy(customersTable.id, customersTable.name)
 				);
 
-			// ✅ Type check: customerSummary should have the aggregated field types
 			expectTypeOf(customerSummary).toHaveProperty('customerId');
 			expectTypeOf(customerSummary).toHaveProperty('customerName');
 			expectTypeOf(customerSummary).toHaveProperty('totalAmount');
 			expectTypeOf(customerSummary).toHaveProperty('orderCount');
 			expectTypeOf(customerSummary).toHaveProperty('drop');
-
 			expectTypeOf(customerSummary.drop).toEqualTypeOf<() => Promise<void>>();
 
-			console.log('✅ Complex temp table created:', customerSummary.customerName);
-
-			// ✅ Type-safe query using the temp table with column access
 			const summary = await db.select({
 				id: customerSummary.customerId,
 			}).from(customerSummary).where(eq(customerSummary.customerId, 1));
 			
-			// ✅ Type check: summary result should be properly typed
 			expectTypeOf(summary).toEqualTypeOf<Array<{ id: number }>>();
-			
 			expect(summary).toHaveLength(1);
 
-			// ✅ Additional type check: full query result types
 			const fullSummary = await db.select().from(customerSummary);
 			expectTypeOf(fullSummary).toEqualTypeOf<Array<{
 				customerId: number;
 				customerName: string;
-				totalAmount: string | null; // Decimal returns as string
+				totalAmount: string | null;
 				orderCount: number;
 			}>>();
 
-			// Clean up
 			await customerSummary.drop();
-			console.log('✅ Complex temp table dropped successfully!');
 			await db.execute(sql`DROP TABLE temp_orders`);
 			await db.execute(sql`DROP TABLE temp_customers`);
 		});

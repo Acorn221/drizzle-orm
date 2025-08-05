@@ -5,7 +5,7 @@ import type { SingleStoreDialect } from './dialect.ts';
 import { Subquery } from '~/subquery.ts';
 
 /**
- * Temporary table builder - step 1 of the chainable API
+ * Temporary table builder for creating temporary tables from queries.
  */
 export class SingleStoreTempTableBuilder {
 	static readonly [entityKind]: string = 'SingleStoreTempTableBuilder';
@@ -17,13 +17,11 @@ export class SingleStoreTempTableBuilder {
 	) {}
 
 	/**
-	 * Pattern 1: .as(query) method to create temporary table from SELECT query
+	 * Creates a temporary table from a SELECT query.
 	 */
 	async as<TSelectedFields extends Record<string, unknown>>(
 		query: TypedQueryBuilder<TSelectedFields> | SQL,
 	): Promise<SingleStoreTempTable<TSelectedFields> & TSelectedFields> {
-		// Execute the CREATE TEMPORARY TABLE AS SELECT statement
-		// We'll extract the raw SQL and parameters manually to completely avoid parentheses
 		let querySQL: SQL;
 		if ('getSQL' in query) {
 			querySQL = query.getSQL();
@@ -31,7 +29,6 @@ export class SingleStoreTempTableBuilder {
 			querySQL = query;
 		}
 		
-		// Convert to query but extract the SQL and parameters manually
 		const builtQuery = this.dialect.sqlToQuery(querySQL);
 		
 		// Remove parentheses from the beginning and end if they exist
@@ -40,15 +37,10 @@ export class SingleStoreTempTableBuilder {
 			cleanSQL = cleanSQL.slice(1, -1);
 		}
 		
-		// Create the final SQL manually with parameters
 		const finalSQL = `CREATE TEMPORARY TABLE \`${this.name}\` AS ${cleanSQL}`;
-		
-		// Create a new SQL object with the clean query and original parameters
 		const createSQL = sql.raw(finalSQL);
 		
-		// We need to manually handle the parameters too
 		if (builtQuery.params && builtQuery.params.length > 0) {
-			// Create a parameterized query
 			let paramIndex = 0;
 			const parameterizedSQL = finalSQL.replace(/\?/g, () => {
 				const param = builtQuery.params[paramIndex++];
@@ -59,15 +51,12 @@ export class SingleStoreTempTableBuilder {
 			await this.executeQuery(createSQL);
 		}
 		
-		// Get the selected fields to create a proper table structure
 		const selectedFields = 'getSelectedFields' in query 
 			? query.getSelectedFields() 
 			: ({} as TSelectedFields);
 		
-		// Create a temp table using Subquery since it accepts Record<string, unknown>
 		const tempTable = new SingleStoreTempTable(this.name, selectedFields, this.executeQuery);
 		
-		// Return with intersection type to include column properties
 		return tempTable as SingleStoreTempTable<TSelectedFields> & TSelectedFields;
 	}
 }
@@ -85,13 +74,11 @@ export type InferTempTableSelectModel<T extends SingleStoreTempTable<any>> = T e
 export type InferTempTableInsertModel<T extends SingleStoreTempTable<any>> = InferTempTableSelectModel<T>;
 
 /**
- * A temporary table that extends Subquery to be compatible with .from() clauses
- * Uses Subquery since it accepts Record<string, unknown> which matches our TSelectedFields
+ * A temporary table that extends Subquery to be compatible with .from() clauses.
  */
 export class SingleStoreTempTable<TSelectedFields extends Record<string, unknown> = Record<string, unknown>> extends Subquery<string, TSelectedFields> {
 	static override readonly [entityKind]: string = 'SingleStoreTempTable';
 
-	// These properties enable InferSelectModel and InferInsertModel to work
 	declare readonly $inferSelect: TSelectedFields;
 	declare readonly $inferInsert: TSelectedFields;
 
@@ -100,17 +87,15 @@ export class SingleStoreTempTable<TSelectedFields extends Record<string, unknown
 		public readonly selectedFields: TSelectedFields,
 		private readonly executeQuery: (sql: SQL) => Promise<any>,
 	) {
-		// Call Subquery constructor with proper arguments
 		super(
-			sql`${sql.identifier(tableName)}`, // The table identifier as SQL
-			selectedFields,                     // The selected fields
-			tableName,                         // alias (table name)
-			false,                             // isWith (not a CTE)
-			[]                                 // usedTables
+			sql`${sql.identifier(tableName)}`,
+			selectedFields,
+			tableName,
+			false,
+			[]
 		);
 		
-		// Add columns as properties, but filter out properties that already exist on this class
-		// to avoid conflicts with our own methods like 'name', 'tableName', etc.
+		// Add columns as properties, avoiding conflicts with existing methods
 		const safeSelectedFields = Object.fromEntries(
 			Object.entries(selectedFields).filter(([key]) => !(key in this))
 		);
@@ -118,15 +103,14 @@ export class SingleStoreTempTable<TSelectedFields extends Record<string, unknown
 	}
 
 	/**
-	 * Override getSQL to return just the table identifier without parentheses
-	 * This makes it behave like a table, not a subquery
+	 * Override getSQL to return just the table identifier without parentheses.
 	 */
 	override getSQL(): SQL {
 		return sql`${sql.identifier(this.tableName)}`;
 	}
 
 	/**
-	 * Drop the temporary table
+	 * Drop the temporary table.
 	 */
 	async drop(): Promise<void> {
 		const dropSQL = sql`DROP TEMPORARY TABLE ${sql.identifier(this.tableName)}`;

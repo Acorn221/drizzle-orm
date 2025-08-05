@@ -491,24 +491,18 @@ export class SingleStoreDatabase<
 	}
 
 	/**
-	 * Pattern 1: Creates a temporary table builder from GitHub issue #3104.
-	 *
-	 * Usage: const myTemporaryTable = await db.temp('my_temporary_table').as(query);
+	 * Creates a temporary table builder.
 	 *
 	 * @param name The name for the temporary table
 	 *
 	 * @example
-	 *
 	 * ```ts
-	 * // Pattern 1: Create a temporary table from a query  
 	 * const myTemporaryTable = await db
 	 *   .temp('my_temporary_table')
 	 *   .as(db.select().from(users));
 	 *
-	 * // Use it like any other table
 	 * const rows = await db.select().from(myTemporaryTable);
 	 * 
-	 * // Drop it when done
 	 * await myTemporaryTable.drop();
 	 * ```
 	 */

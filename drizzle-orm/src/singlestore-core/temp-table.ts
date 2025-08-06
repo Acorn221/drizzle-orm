@@ -2,6 +2,7 @@ import { entityKind } from '~/entity.ts';
 import type { TypedQueryBuilder } from '~/query-builders/query-builder.ts';
 import { SQL, sql } from '~/sql/sql.ts';
 import { Subquery } from '~/subquery.ts';
+import { Table } from '~/table.ts';
 import type { SingleStoreDialect } from './dialect.ts';
 
 /**
@@ -97,9 +98,44 @@ export class SingleStoreTempTable<TSelectedFields extends Record<string, unknown
 			[],
 		);
 
+		// Set up the table symbols like a real table to make temp table work properly
+		(this as any)[Table.Symbol.Name] = tableName;
+		(this as any)[Table.Symbol.OriginalName] = tableName;
+		(this as any)[Table.Symbol.BaseName] = tableName;
+		(this as any)[Table.Symbol.Schema] = undefined;
+		(this as any)[Table.Symbol.IsAlias] = false;
+
+		// Create column proxies that reference THIS temp table instead of the original table
+		const builtColumns: Record<string, any> = {};
+
+		for (const [key, column] of Object.entries(selectedFields)) {
+			// If this is a column object, create a proxy that references this temp table
+			if (column && typeof column === 'object' && 'table' in column) {
+				// Create a new column object that points to our temp table
+				const tempColumnProxy = Object.create(Object.getPrototypeOf(column));
+				// Copy all properties from the original column
+				Object.assign(tempColumnProxy, column);
+				// But change the table reference to point to this temp table
+				Object.defineProperty(tempColumnProxy, 'table', {
+					value: this,
+					writable: false,
+					enumerable: true,
+					configurable: false,
+				});
+				builtColumns[key] = tempColumnProxy;
+			} else {
+				// Not a column, keep as is
+				builtColumns[key] = column;
+			}
+		}
+
+		// Set up the column symbols
+		(this as any)[Table.Symbol.Columns] = builtColumns;
+		(this as any)[Table.Symbol.ExtraConfigColumns] = builtColumns;
+
 		// Add columns as properties, avoiding conflicts with existing methods
 		const safeSelectedFields = Object.fromEntries(
-			Object.entries(selectedFields).filter(([key]) => !(key in this)),
+			Object.entries(builtColumns).filter(([key]) => !(key in this)),
 		);
 		Object.assign(this, safeSelectedFields);
 	}
@@ -109,6 +145,13 @@ export class SingleStoreTempTable<TSelectedFields extends Record<string, unknown
 	 */
 	override getSQL(): SQL {
 		return sql`${sql.identifier(this.tableName)}`;
+	}
+
+	/**
+	 * Prevents the temp table from being wrapped in parentheses in SQL generation.
+	 */
+	override shouldOmitSQLParens(): boolean {
+		return true;
 	}
 
 	/**

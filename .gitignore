@@ -1,0 +1,11 @@
+# Ignore everything
+/*
+
+# But not the drizzle-orm folder
+!/drizzle-orm/
+
+# Ignore everything in drizzle-orm
+/drizzle-orm/*
+
+# But not the dist folder
+!/drizzle-orm/dist/

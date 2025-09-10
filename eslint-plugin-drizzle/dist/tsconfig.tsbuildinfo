@@ -1,0 +1,1 @@
+{"root":["../src/enforce-delete-with-where.ts","../src/enforce-update-with-where.ts","../src/index.ts","../src/configs/all.ts","../src/configs/recommended.ts","../src/utils/ast.ts","../src/utils/options.ts","../package.json"],"version":"5.6.3"}
